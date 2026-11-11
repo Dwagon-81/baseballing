@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Name Every Ballplayer</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Oswald:wght@500;700&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="brand">
+      <h1>Name Every Ballplayer</h1>
+      <span class="sub">MLB, 2000 – today</span>
+    </div>
+    <div class="scores">
+      <div class="score big"><span id="warPct">0.0%</span><label>of all WAR named</label></div>
+      <div class="score"><span id="count">0</span><label>of <span id="total">…</span> players</label></div>
+      <div class="score"><span id="hof">0</span><label>of <span id="hofTotal">…</span> Hall of Famers</label></div>
+      <div class="score"><span id="countries">0</span><label>countries</label></div>
+    </div>
+  </header>
+
+  <div class="entry">
+    <input id="guess" type="text" autocomplete="off" spellcheck="false" placeholder="Type a player's name…" autofocus>
+    <div id="feedback" aria-live="polite"></div>
+  </div>
+
+  <main>
+    <section class="stage">
+      <div class="tabs" role="tablist">
+        <button class="tab active" data-view="diamond" role="tab">Diamond</button>
+        <button class="tab" data-view="map" role="tab">Birthplaces</button>
+      </div>
+      <div id="diamond" class="view active"></div>
+      <div id="map" class="view"></div>
+      <div id="tooltip" hidden></div>
+    </section>
+
+    <aside>
+      <div class="aside-head">
+        <h2 id="listTitle">Named</h2>
+        <div class="actions">
+          <button id="giveUp">Give up</button>
+          <button id="reset">Reset</button>
+        </div>
+      </div>
+      <ol id="list"></ol>
+    </aside>
+  </main>
+
+  <footer>
+    WAR data via <a href="https://www.baseball-reference.com" target="_blank" rel="noopener">Baseball-Reference</a>.
+    Player info from MLB Stats API; birthplaces from Wikidata and OpenStreetMap.
+  </footer>
+
+  <script src="https://cdn.jsdelivr.net/npm/d3@7.9.0/dist/d3.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/topojson-client@3.1.0/dist/topojson-client.min.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
