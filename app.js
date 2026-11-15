@@ -91,14 +91,25 @@ function accept(list) {
   renderAll();
 }
 
+// Names that are the start of a longer name ("brandon wood" -> "brandon woodruff").
+const prefixKeys = new Set();
+let pendingAccept = null;
+
 input.addEventListener("input", () => {
+  clearTimeout(pendingAccept);
   const n = norm(input.value);
-  // Auto-accept as soon as a full name matches, like cityquiz.
-  if (n.includes(" ") && keyIndex.has(n)) accept(keyIndex.get(n));
+  if (!n.includes(" ") || !keyIndex.has(n)) return;
+  // Auto-accept as soon as a full name matches, like cityquiz. If the name could still
+  // grow into a longer one, wait until typing pauses (Enter accepts right away).
+  if (!prefixKeys.has(n)) return accept(keyIndex.get(n));
+  pendingAccept = setTimeout(() => {
+    if (norm(input.value) === n) accept(keyIndex.get(n));
+  }, 900);
 });
 
 input.addEventListener("keydown", e => {
   if (e.key !== "Enter") return;
+  clearTimeout(pendingAccept);
   const n = norm(input.value);
   if (!n) return;
   if (keyIndex.has(n)) return accept(keyIndex.get(n));
@@ -421,6 +432,9 @@ document.getElementById("reset").addEventListener("click", () => {
     }
     addKey(lastIndex, p.last.replace(/ (jr|sr|ii|iii|iv)$/, ""), p);
   }
+  // In sorted order, any key that starts another key sits right before it.
+  const sorted = [...keyIndex.keys()].sort();
+  sorted.forEach((k, i) => { if (sorted[i + 1]?.startsWith(k)) prefixKeys.add(k); });
   totalWar = players.reduce((s, p) => s + posWar(p), 0);
   document.getElementById("total").textContent = players.length.toLocaleString();
   document.getElementById("hofTotal").textContent = players.filter(p => p.hof).length;
