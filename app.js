@@ -47,6 +47,29 @@ function say(msg, cls = "") {
   feedback.className = cls;
 }
 
+// ---------- analytics (GoatCounter events; no-op if the script is blocked or on localhost) ----------
+// Kept to a few events per visit so we stay well under GoatCounter's free-tier limits.
+const MILESTONES = [1, 10, 25, 50, 100, 250, 500, 1000, 2000, 5000];
+let sessionNamed = 0, sessionSent = false;
+const tracked = new Set();
+function track(path, title = path) {
+  try { window.goatcounter?.count?.({ path, title, event: true }); } catch {}
+}
+function trackOnce(path, title) {
+  if (tracked.has(path)) return;
+  tracked.add(path);
+  track(path, title);
+}
+function bucket(n) {
+  return n === 0 ? "0" : n < 10 ? "1-9" : n < 50 ? "10-49" : n < 100 ? "50-99" : n < 250 ? "100-249" : n < 500 ? "250-499" : "500+";
+}
+// One summary per visit: how many players were named during this visit.
+document.addEventListener("visibilitychange", () => {
+  if (document.visibilityState !== "hidden" || sessionSent) return;
+  sessionSent = true;
+  track(`visit-named-${bucket(sessionNamed)}`, `Named ${bucket(sessionNamed)} players in one visit`);
+});
+
 function accept(list) {
   const fresh = list.filter(p => !guessed.has(p.id));
   if (!fresh.length) {
@@ -55,8 +78,13 @@ function accept(list) {
     return;
   }
   justAdded = new Set(fresh.map(p => p.id));
+  const before = guessed.size;
   for (const p of fresh) { guessed.add(p.id); order.push(p.id); }
   save();
+  sessionNamed += fresh.length;
+  for (const m of MILESTONES) {
+    if (before < m && guessed.size >= m) track(`milestone-${m}`, `Reached ${m} players named`);
+  }
   const names = fresh.map(p => `${p.name} (${p.pos}, ${p.war} WAR)`).join(" + ");
   say(`✓ ${names}`, "good");
   input.value = "";
@@ -365,17 +393,20 @@ function renderAll() {
 document.querySelectorAll(".tab").forEach(t => t.addEventListener("click", () => {
   document.querySelectorAll(".tab").forEach(x => x.classList.toggle("active", x === t));
   document.querySelectorAll(".view").forEach(v => v.classList.toggle("active", v.id === t.dataset.view));
+  trackOnce(`view-${t.dataset.view}`, `Opened ${t.textContent} view`);
   input.focus();
 }));
 
 document.getElementById("giveUp").addEventListener("click", e => {
   revealed = !revealed;
   e.target.textContent = revealed ? "Hide answers" : "Give up";
+  if (revealed) trackOnce("give-up", "Gave up");
   renderAll();
 });
 
 document.getElementById("reset").addEventListener("click", () => {
   if (!confirm("Clear every player you've named?")) return;
+  track("reset", "Reset progress");
   guessed.clear(); order = []; save(); say("");
   renderAll();
 });
