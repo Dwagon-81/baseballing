@@ -33,15 +33,18 @@
       <div class="tabs" role="tablist">
         <button class="tab active" data-view="diamond" role="tab">Diamond</button>
         <button class="tab" data-view="map" role="tab">Birthplaces</button>
+        <button class="tab" data-view="teams" role="tab">Teams</button>
       </div>
       <div id="diamond" class="view active"></div>
       <div id="map" class="view"></div>
+      <div id="teams" class="view"></div>
       <div id="tooltip" hidden></div>
     </section>
 
     <aside>
       <div class="aside-head">
         <h2 id="listTitle">Named</h2>
+        <button id="clearTeam" hidden title="Show all teams">×</button>
         <div class="actions">
           <button id="giveUp">Give up</button>
           <button id="reset">Reset</button>

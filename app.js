@@ -138,14 +138,23 @@ function li(p, cls = "") {
   el.className = cls;
   el.innerHTML = `<span class="n"></span><span class="w">${p.war.toFixed(1)}</span><span class="m"></span>`;
   el.querySelector(".n").textContent = p.name + (p.hof ? " ★" : "");
-  el.querySelector(".m").textContent = `${p.pos} · ${p.team} · ${yrs(p)} · ${p.born}`;
+  el.querySelector(".m").textContent = `${p.pos} · ${teamsShort(p)} · ${yrs(p)} · ${p.born}`;
   return el;
 }
+const teamsShort = p => p.teams.length > 1 ? `${p.team} +${p.teams.length - 1}` : p.team;
 
 function renderList() {
   const list = document.getElementById("list");
   list.replaceChildren();
-  if (revealed) {
+  document.getElementById("clearTeam").hidden = !selectedTeam;
+  if (selectedTeam) {
+    const t = TEAM_INFO[selectedTeam];
+    const onTeam = p => p.teams.includes(selectedTeam);
+    const named = [...order].reverse().map(id => byId.get(id)).filter(onTeam);
+    document.getElementById("listTitle").textContent = `${t.name} · ${named.length}`;
+    named.forEach(p => list.append(li(p, justAdded.has(p.id) ? "new" : "")));
+    if (revealed) players.filter(p => onTeam(p) && !guessed.has(p.id)).slice(0, 200).forEach(p => list.append(li(p, "missed")));
+  } else if (revealed) {
     document.getElementById("listTitle").textContent = "Biggest misses";
     players.filter(p => !guessed.has(p.id)).slice(0, 200).forEach(p => list.append(li(p, "missed")));
   } else {
@@ -162,7 +171,8 @@ function showTip(e, p) {
   tip.querySelector("b").textContent = guessed.has(p.id) ? p.name : "???";
   tip.querySelector("span").textContent = (guessed.has(p.id)
     ? `${POS_NAME[p.pos] || p.pos} · ${p.team} · ${yrs(p)} · ${p.war} WAR · born ${p.born}`
-    : `${POS_NAME[p.pos] || p.pos} · ${p.team} · ${yrs(p)} · ${p.war} WAR`) + (p.hof ? " · Hall of Famer" : "");
+    : `${POS_NAME[p.pos] || p.pos} · ${p.team} · ${yrs(p)} · ${p.war} WAR`)
+    + (p.teams.length > 1 ? ` · played for ${p.teams.length} teams` : "") + (p.hof ? " · Hall of Famer" : "");
   if (revealed) tip.querySelector("b").textContent = p.name;
   tip.hidden = false;
   moveTip(e);
@@ -393,11 +403,96 @@ function renderMap() {
 }
 
 // =====================================================================
+// Teams view: one tile per franchise, counting every team a player was on since 2000
+// =====================================================================
+// [abbr shown, name, primary color, secondary color]
+const DIVISIONS = {
+  "American League": {
+    East: [["BAL", "Orioles", "#DF4601", "#000000"], ["BOS", "Red Sox", "#BD3039", "#0C2340"], ["NYY", "Yankees", "#0C2340", "#C4CED3"], ["TBR", "Rays", "#092C5C", "#8FBCE6"], ["TOR", "Blue Jays", "#134A8E", "#E8291C"]],
+    Central: [["CHW", "White Sox", "#27251F", "#C4CED4"], ["CLE", "Guardians", "#00385D", "#E50022"], ["DET", "Tigers", "#0C2340", "#FA4616"], ["KCR", "Royals", "#004687", "#BD9B60"], ["MIN", "Twins", "#002B5C", "#D31145"]],
+    West: [["ATH", "Athletics", "#003831", "#EFB21E"], ["HOU", "Astros", "#002D62", "#EB6E1F"], ["LAA", "Angels", "#BA0021", "#003263"], ["SEA", "Mariners", "#0C2C56", "#005C5C"], ["TEX", "Rangers", "#003278", "#C0111F"]],
+  },
+  "National League": {
+    East: [["ATL", "Braves", "#CE1141", "#13274F"], ["MIA", "Marlins", "#00A3E0", "#EF3340"], ["NYM", "Mets", "#002D72", "#FF5910"], ["PHI", "Phillies", "#E81828", "#002D72"], ["WSN", "Nationals / Expos", "#AB0003", "#14225A"]],
+    Central: [["CHC", "Cubs", "#0E3386", "#CC3433"], ["CIN", "Reds", "#C6011F", "#000000"], ["MIL", "Brewers", "#12284B", "#FFC52F"], ["PIT", "Pirates", "#27251F", "#FDB827"], ["STL", "Cardinals", "#C41E3A", "#0C2340"]],
+    West: [["ARI", "Diamondbacks", "#A71930", "#E3D4AD"], ["COL", "Rockies", "#33006F", "#C4CED4"], ["LAD", "Dodgers", "#005A9C", "#EF3E42"], ["SDP", "Padres", "#2F241D", "#FFC425"], ["SFG", "Giants", "#FD5A1E", "#27251F"]],
+  },
+};
+const TEAM_INFO = {};
+for (const divs of Object.values(DIVISIONS))
+  for (const teams of Object.values(divs))
+    for (const [code, name, c1, c2] of teams) TEAM_INFO[code] = { name, c1, c2 };
+
+let selectedTeam = null;
+const tileEls = {};
+
+function drawTeams() {
+  const root = document.getElementById("teams");
+  for (const [league, divs] of Object.entries(DIVISIONS)) {
+    const sec = document.createElement("section");
+    sec.className = "league";
+    sec.innerHTML = `<h3>${league}</h3><div class="divisions"></div>`;
+    for (const [div, teams] of Object.entries(divs)) {
+      const col = document.createElement("div");
+      col.className = "division";
+      col.innerHTML = `<h4>${div}</h4>`;
+      for (const [code] of teams) {
+        const t = TEAM_INFO[code];
+        const b = document.createElement("button");
+        b.className = "team";
+        b.innerHTML = `<span class="badge" style="background:${t.c1};border-color:${t.c2}">${code}</span>
+          <span class="tname">${t.name}</span><span class="tnum"></span>
+          <span class="bar"><i></i></span><span class="twar"></span>`;
+        b.addEventListener("click", () => {
+          selectedTeam = selectedTeam === code ? null : code;
+          renderTeams(); renderList();
+          input.focus();
+        });
+        tileEls[code] = b;
+        col.append(b);
+      }
+      sec.querySelector(".divisions").append(col);
+    }
+    root.append(sec);
+  }
+}
+
+function renderTeams() {
+  const all = {}, got = {}, warAll = {}, warGot = {}, bumped = new Set();
+  for (const p of players) {
+    for (const t of p.teams) {
+      all[t] = (all[t] || 0) + 1;
+      warAll[t] = (warAll[t] || 0) + posWar(p);
+      if (guessed.has(p.id)) {
+        got[t] = (got[t] || 0) + 1;
+        warGot[t] = (warGot[t] || 0) + posWar(p);
+        if (justAdded.has(p.id)) bumped.add(t);
+      }
+    }
+  }
+  for (const [code, el] of Object.entries(tileEls)) {
+    const g = got[code] || 0, a = all[code] || 0;
+    el.querySelector(".tnum").innerHTML = `${g} <small>/ ${a}</small>`;
+    el.querySelector(".bar i").style.width = `${a ? 100 * g / a : 0}%`;
+    el.querySelector(".twar").textContent = `${(100 * (warGot[code] || 0) / (warAll[code] || 1)).toFixed(0)}% WAR`;
+    el.classList.toggle("selected", code === selectedTeam);
+    el.classList.remove("bump");
+    if (bumped.has(code)) { void el.offsetWidth; el.classList.add("bump"); }
+  }
+}
+
+document.getElementById("clearTeam").addEventListener("click", () => {
+  selectedTeam = null;
+  renderTeams(); renderList();
+});
+
+// =====================================================================
 function renderAll() {
   renderScore();
   renderList();
   renderDiamond();
   renderMap();
+  renderTeams();
   justAdded = new Set();
 }
 
@@ -440,6 +535,7 @@ document.getElementById("reset").addEventListener("click", () => {
   document.getElementById("hofTotal").textContent = players.filter(p => p.hof).length;
   load();
   drawField();
+  drawTeams();
   renderAll();
   drawMap();
 })();

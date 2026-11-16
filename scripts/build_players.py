@@ -28,7 +28,10 @@ years = defaultdict(set)
 ip_start = defaultdict(float)
 ip_relief = defaultdict(float)
 bbref = {}
-teams = defaultdict(lambda: defaultdict(float))  # mlb id -> team -> games
+teams = defaultdict(lambda: defaultdict(float))  # mlb id -> franchise -> games
+# Fold relocated/renamed clubs into today's 30 franchises.
+FRANCHISE = {"ANA": "LAA", "FLA": "MIA", "MON": "WSN", "TBD": "TBR", "OAK": "ATH"}
+fr = lambda t: FRANCHISE.get(t, t)
 
 with open(os.path.join(RAW, "war_bat.txt"), newline="") as f:
     for r in csv.DictReader(f):
@@ -40,7 +43,9 @@ with open(os.path.join(RAW, "war_bat.txt"), newline="") as f:
         years[i].add(y)
         bbref[i] = r["player_ID"]
         if y >= FIRST_YEAR and r["pitcher"] == "N":
-            teams[i][r["team_ID"]] += num(r["G"])
+            teams[i][fr(r["team_ID"])] += num(r["G"])
+        elif y >= FIRST_YEAR:
+            teams[i].setdefault(fr(r["team_ID"]), 0.0)  # pitcher's batting row: team only
 
 with open(os.path.join(RAW, "war_pitch.txt"), newline="") as f:
     for r in csv.DictReader(f):
@@ -54,7 +59,7 @@ with open(os.path.join(RAW, "war_pitch.txt"), newline="") as f:
         ip_start[i] += num(r["IPouts_start"])
         ip_relief[i] += num(r["IPouts_relief"])
         if y >= FIRST_YEAR:
-            teams[i][r["team_ID"]] += num(r["G"])
+            teams[i][fr(r["team_ID"])] += num(r["G"])
 
 # --- Bio from MLB Stats API -------------------------------------------------
 bio = {}
@@ -116,6 +121,7 @@ for i, p in bio.items():
         "from": min(years[i]),
         "to": max(years[i]),
         "team": team,
+        "teams": sorted(teams[i]),  # every franchise played for since 2000
         "born": ", ".join(x for x in [p.get("birthCity"), p.get("birthStateProvince"), p.get("birthCountry")] if x),
         "country": p.get("birthCountry", ""),
         "ll": c,
